@@ -1,0 +1,763 @@
+<meta charset="utf-8">
+<title>Egg Drop Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: lab bench — controls on the left, drop shaft canvas + readouts on the right; stacks on phones */
+:root {
+  --bg: #EBF0F2;
+  --panel: #FFFFFF;
+  --ink: #152027;
+  --muted: #5A6A72;
+  --line: #D2DBDF;
+  --yolk: #EFA300;
+  --shell: #F3E6D2;
+  --shell-shade: #D9C4A4;
+  --ok: #1B8A57;
+  --bad: #CF3B2B;
+  --sky-top: #DCE8EE;
+  --sky-bot: #F6F9FA;
+  --floor: #9AA7AD;
+  --floor-dark: #7D8B92;
+  --accent: #2E6F8E;
+  --font-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F161A; --panel: #172228; --ink: #E4ECEF; --muted: #93A4AC; --line: #2A3A42;
+    --yolk: #FFBE2E; --shell: #EADCC6; --shell-shade: #B9A281; --ok: #3CC98A; --bad: #FF6E5C;
+    --sky-top: #142028; --sky-bot: #1D2C34; --floor: #4A585F; --floor-dark: #3A464C; --accent: #6FB3D2;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F161A; --panel: #172228; --ink: #E4ECEF; --muted: #93A4AC; --line: #2A3A42;
+  --yolk: #FFBE2E; --shell: #EADCC6; --shell-shade: #B9A281; --ok: #3CC98A; --bad: #FF6E5C;
+  --sky-top: #142028; --sky-bot: #1D2C34; --floor: #4A585F; --floor-dark: #3A464C; --accent: #6FB3D2;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+}
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 20px;
+}
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.02em; margin: 0; line-height: 1.05; text-wrap: balance; }
+h1 span { color: var(--yolk); }
+.sub { color: var(--muted); margin: 0; max-width: 60ch; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+
+.bench { display: grid; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 820px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 18px; min-width: 0; }
+.group { display: grid; gap: 14px; }
+.group + .group { border-top: 1px solid var(--line); padding-top: 16px; }
+.field { display: grid; gap: 6px; }
+.field-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.field-head label { font-weight: 600; font-size: 14px; }
+.num { display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 14px; }
+.num input {
+  width: 72px; text-align: right; font: inherit; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px;
+}
+.num span { color: var(--muted); min-width: 22px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+select {
+  font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 8px; width: 100%;
+}
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font: inherit; font-size: 12.5px; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 999px; padding: 3px 10px; cursor: pointer;
+}
+.chip:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.drop {
+  flex: 1 1 auto; font-family: var(--font-display); font-weight: 800; font-size: 18px; letter-spacing: 0.01em;
+  background: var(--yolk); color: #1a1405; border: 0; border-radius: 10px; padding: 12px 18px; cursor: pointer;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.18);
+}
+.drop:hover { filter: brightness(1.05); }
+.drop:active { transform: translateY(1px); box-shadow: none; }
+.ghost {
+  font: inherit; font-weight: 600; background: transparent; color: var(--ink); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 14px; cursor: pointer;
+}
+.speed { display: flex; gap: 4px; align-items: center; }
+.speed button {
+  font: inherit; font-size: 12.5px; font-family: var(--font-mono); background: var(--bg); color: var(--muted);
+  border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; cursor: pointer;
+}
+.speed button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+
+.stage { display: grid; gap: 16px; min-width: 0; }
+.shaft { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.shaft canvas { display: block; width: 100%; height: 500px; }
+@media (max-width: 820px) { .shaft canvas { height: 420px; } }
+.shaft-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-top: 1px solid var(--line); }
+
+.readout { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 620px) { .readout { grid-template-columns: minmax(0, 1fr); } }
+.force-card { display: grid; gap: 10px; }
+.force-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.big { font-family: var(--font-display); font-weight: 800; font-size: clamp(40px, 6vw, 56px); line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.big small { font-size: 0.42em; font-weight: 600; color: var(--muted); margin-left: 4px; letter-spacing: 0; }
+.pill { font-weight: 700; font-size: 13px; padding: 4px 12px; border-radius: 999px; border: 1.5px solid currentColor; white-space: nowrap; }
+.pill.ok { color: var(--ok); }
+.pill.bad { color: var(--bad); }
+.pill.idle { color: var(--muted); }
+.gauge { position: relative; height: 14px; border-radius: 7px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.gauge-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--ok); transition: width 0.5s ease, background 0.3s; }
+.gauge-mark { position: absolute; top: -3px; bottom: -3px; left: 50%; width: 2px; background: var(--ink); }
+.gauge-scale { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.gauge-scale b { color: var(--ink); font-weight: 600; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; margin: 0; }
+.stats div { display: grid; gap: 2px; }
+.stats dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.stats dd { margin: 0; font-family: var(--font-mono); font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.note { font-size: 13.5px; color: var(--muted); margin: 0; }
+.note strong { color: var(--ink); }
+
+.log-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+th:first-child, td:first-child { text-align: left; }
+td { font-family: var(--font-mono); }
+td.res-ok { color: var(--ok); font-weight: 600; }
+td.res-bad { color: var(--bad); font-weight: 600; }
+.empty { color: var(--muted); text-align: left; font-family: var(--font-body); }
+.log-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+
+details summary { cursor: pointer; font-weight: 600; }
+.formulas { display: grid; gap: 8px; margin-top: 10px; font-size: 14px; }
+.formulas code { font-family: var(--font-mono); font-size: 13px; background: var(--bg); padding: 1px 6px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { .gauge-fill { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Egg Drop <span>Lab</span></h1>
+      <p class="sub">Set the height and the egg, add cushioning or a parachute, then drop it. The egg cracks at 20 newtons of impact force.</p>
+    </div>
+  </header>
+
+  <div class="bench">
+    <form class="panel" id="controls" autocomplete="off">
+      <div class="group">
+        <span class="label">The drop</span>
+        <div class="field">
+          <div class="field-head">
+            <label for="height">Drop height</label>
+            <div class="num"><input id="heightNum" type="number" min="0.1" max="50" step="0.1" aria-label="Drop height in meters"><span>m</span></div>
+          </div>
+          <input id="height" type="range" min="0.1" max="50" step="0.1">
+          <div class="chips" id="heightChips">
+            <button type="button" class="chip" data-h="0.9">Counter · 0.9 m</button>
+            <button type="button" class="chip" data-h="2">Ladder · 2 m</button>
+            <button type="button" class="chip" data-h="6">2nd-floor window · 6 m</button>
+            <button type="button" class="chip" data-h="15">Bleachers · 15 m</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-head">
+            <label for="mass">Egg weight</label>
+            <div class="num"><input id="massNum" type="number" min="20" max="150" step="1" aria-label="Egg weight in grams"><span>g</span></div>
+          </div>
+          <input id="mass" type="range" min="20" max="150" step="1">
+          <p class="hint">A large chicken egg is about 60 g.</p>
+        </div>
+      </div>
+
+      <div class="group">
+        <span class="label">Protection</span>
+        <div class="field">
+          <div class="field-head">
+            <label for="cushion">Cushioning</label>
+            <div class="num"><input id="cushionNum" type="number" min="0" max="30" step="0.5" aria-label="Cushioning thickness in centimeters"><span>cm</span></div>
+          </div>
+          <input id="cushion" type="range" min="0" max="30" step="0.5">
+        </div>
+        <div class="field">
+          <label for="material" style="font-weight:600;font-size:14px">Cushion material</label>
+          <select id="material">
+            <option value="foam">Foam padding (squashes 85%)</option>
+            <option value="bubble">Bubble wrap (squashes 70%)</option>
+            <option value="paper">Crumpled paper (squashes 55%)</option>
+            <option value="cotton">Cotton balls (squashes 90%)</option>
+          </select>
+          <p class="hint">How much of the cushion's thickness the egg can sink into while it slows down.</p>
+        </div>
+        <div class="field">
+          <div class="field-head">
+            <label for="chute">Parachute diameter</label>
+            <div class="num"><input id="chuteNum" type="number" min="0" max="150" step="1" aria-label="Parachute diameter in centimeters"><span>cm</span></div>
+          </div>
+          <input id="chute" type="range" min="0" max="150" step="1">
+          <p class="hint">0 means no parachute. Bigger canopies make more air resistance.</p>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="drop" id="dropBtn">Drop the egg</button>
+        <button type="button" class="ghost" id="resetBtn">Reset</button>
+      </div>
+    </form>
+
+    <div class="stage">
+      <div class="shaft">
+        <canvas id="cv" aria-label="Animation of the egg falling from the drop height onto the landing surface"></canvas>
+        <div class="shaft-bar">
+          <span class="label">Playback</span>
+          <div class="speed" id="speed" role="group" aria-label="Playback speed">
+            <button type="button" data-s="1" aria-pressed="false">1×</button>
+            <button type="button" data-s="0.5" aria-pressed="true">½×</button>
+            <button type="button" data-s="0.2" aria-pressed="false">⅕×</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="readout">
+        <section class="panel force-card" aria-live="polite">
+          <div class="force-top">
+            <span class="label">Impact force</span>
+            <span class="pill idle" id="verdict">Waiting for drop</span>
+          </div>
+          <div class="big" id="force">—<small>N</small></div>
+          <div class="gauge" aria-hidden="true"><div class="gauge-fill" id="gauge"></div><div class="gauge-mark"></div></div>
+          <div class="gauge-scale"><span>0 N</span><b>20 N breaks</b><span>40 N+</span></div>
+          <p class="note" id="explain">Press <strong>Drop the egg</strong> to run the test.</p>
+        </section>
+        <section class="panel">
+          <dl class="stats">
+            <div><dt>Fall time</dt><dd id="sTime">—</dd></div>
+            <div><dt>Impact speed</dt><dd id="sSpeed">—</dd></div>
+            <div><dt>Stopping distance</dt><dd id="sStop">—</dd></div>
+            <div><dt>Stopping time</dt><dd id="sStopT">—</dd></div>
+            <div><dt>Top speed possible</dt><dd id="sTerm">—</dd></div>
+            <div><dt>Max safe height</dt><dd id="sSafe">—</dd></div>
+          </dl>
+        </section>
+      </div>
+
+      <section class="panel">
+        <div class="log-head">
+          <h2>Trial log</h2>
+          <button type="button" class="ghost" id="clearLog" style="padding:5px 10px;font-size:13px">Clear</button>
+        </div>
+        <div class="log-wrap">
+          <table>
+            <thead><tr><th>Trial</th><th>Height</th><th>Egg</th><th>Cushion</th><th>Chute</th><th>Speed</th><th>Force</th><th>Result</th></tr></thead>
+            <tbody id="logBody"><tr><td colspan="8" class="empty">Your drops will be listed here so you can compare setups.</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <details>
+          <summary>How the numbers are worked out</summary>
+          <div class="formulas">
+            <p class="note"><strong>Falling.</strong> Gravity pulls with <code>m·g</code> (g = 9.81 m/s²). Air pushes back with drag <code>½·ρ·Cd·A·v²</code> (air density ρ = 1.225 kg/m³). The egg alone has Cd ≈ 0.47 and is about 4.3 cm wide; a parachute canopy has Cd ≈ 1.5. The fall is stepped forward in 0.5 ms slices to get the speed at impact.</p>
+            <p class="note"><strong>Landing.</strong> All of that motion has to stop within the stopping distance <code>d</code>. On a hard floor the shell only gives about 2 mm. Cushioning adds its thickness times how much the material squashes. The average force is <code>F = m·v² ÷ (2·d) + m·g</code>.</p>
+            <p class="note"><strong>Breaking.</strong> The egg cracks if <code>F</code> reaches 20 N. This is the average force during the stop; real impacts peak higher, so leave some margin in a real test.</p>
+          </div>
+        </details>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const G = 9.81, RHO = 1.225, BREAK_N = 20;
+  const EGG_D = 0.043, CD_EGG = 0.47, CD_CHUTE = 1.5, SHELL_GIVE = 0.002;
+  const MATERIALS = {
+    foam:   { name: "Foam",           squash: 0.85, fill: "#9FC9DD", dot: "#7DB0C8" },
+    bubble: { name: "Bubble wrap",    squash: 0.70, fill: "#CFE6EE", dot: "#9CC5D3" },
+    paper:  { name: "Crumpled paper", squash: 0.55, fill: "#D8D1C4", dot: "#B6AC99" },
+    cotton: { name: "Cotton",         squash: 0.90, fill: "#F2F2EE", dot: "#D6D6CF" },
+  };
+  const $ = id => document.getElementById(id);
+
+  const state = { height: 2, mass: 60, cushion: 0, material: "foam", chute: 0 };
+  let speed = 0.5;
+
+  // ---------- physics ----------
+  function dragK(p) {
+    const aEgg = Math.PI * (EGG_D / 2) ** 2;
+    const aChute = p.chute > 0 ? Math.PI * (p.chute / 200) ** 2 : 0;
+    return 0.5 * RHO * (CD_EGG * aEgg + CD_CHUTE * aChute);
+  }
+  function fall(p, record) {
+    const m = p.mass / 1000, k = dragK(p), dt = 0.0005;
+    let y = p.height, v = 0, t = 0;
+    const traj = record ? [{ t: 0, y, v }] : null;
+    let nextRec = 0.004;
+    while (y > 0) {
+      const a = G - (k * v * v) / m;
+      const vNew = v + a * dt;
+      const yNew = y - vNew * dt;
+      if (yNew <= 0) {
+        const frac = y / (y - yNew); // interpolate exact landing
+        t += dt * frac; v = v + (vNew - v) * frac; y = 0;
+        break;
+      }
+      v = vNew; y = yNew; t += dt;
+      if (record && t >= nextRec) { traj.push({ t, y, v }); nextRec += 0.004; }
+    }
+    if (record) traj.push({ t, y: 0, v });
+    return { t, v, traj };
+  }
+  function stopDist(p) {
+    return SHELL_GIVE + (p.cushion / 100) * MATERIALS[p.material].squash;
+  }
+  function impactForce(p, v) {
+    const m = p.mass / 1000;
+    return (m * v * v) / (2 * stopDist(p)) + m * G;
+  }
+  function terminalV(p) { return Math.sqrt((p.mass / 1000) * G / dragK(p)); }
+  function maxSafeHeight(p) {
+    const vt = terminalV(p);
+    if (impactForce(p, vt * 0.999) < BREAK_N) return Infinity;
+    const m = p.mass / 1000, d = stopDist(p);
+    if (m * G >= BREAK_N) return 0;
+    const vSafe = Math.sqrt((BREAK_N - m * G) * 2 * d / m);
+    let lo = 0, hi = 1;
+    while (fall({ ...p, height: hi }).v < vSafe && hi < 5000) hi *= 2;
+    for (let i = 0; i < 28; i++) {
+      const mid = (lo + hi) / 2;
+      if (fall({ ...p, height: mid }).v < vSafe) lo = mid; else hi = mid;
+    }
+    return lo;
+  }
+  function run(p) {
+    const f = fall(p, true);
+    const F = impactForce(p, f.v);
+    const d = stopDist(p);
+    return { ...f, F, d, stopT: f.v > 0 ? (2 * d) / f.v : 0, broken: F >= BREAK_N, vt: terminalV(p), safe: maxSafeHeight(p) };
+  }
+
+  // ---------- formatting ----------
+  const fmt = (x, n) => x.toLocaleString(undefined, { minimumFractionDigits: n, maximumFractionDigits: n });
+  function fmtH(h) { return h >= 10 ? fmt(h, 1) + " m" : h >= 1 ? fmt(h, 2) + " m" : fmt(h * 100, 0) + " cm"; }
+  function fmtForce(F) { return F >= 1000 ? fmt(F, 0) : F >= 100 ? fmt(F, 0) : fmt(F, 1); }
+
+  // ---------- controls ----------
+  const pairs = [["height", "heightNum"], ["mass", "massNum"], ["cushion", "cushionNum"], ["chute", "chuteNum"]];
+  function syncInputs() {
+    for (const [r, n] of pairs) { $(r).value = state[r]; $(n).value = state[r]; }
+    $("material").value = state.material;
+    $("material").disabled = state.cushion <= 0;
+  }
+  function setVal(key, raw) {
+    const el = $(key);
+    let v = parseFloat(raw);
+    if (!isFinite(v)) return;
+    v = Math.min(parseFloat(el.max), Math.max(parseFloat(el.min), v));
+    state[key] = v;
+    syncInputs();
+    toReady();
+  }
+  for (const [r, n] of pairs) {
+    $(r).addEventListener("input", e => setVal(r, e.target.value));
+    $(n).addEventListener("change", e => setVal(r, e.target.value));
+  }
+  $("material").addEventListener("change", e => { state.material = e.target.value; toReady(); });
+  $("heightChips").addEventListener("click", e => {
+    const b = e.target.closest("[data-h]"); if (b) setVal("height", b.dataset.h);
+  });
+  $("controls").addEventListener("submit", e => { e.preventDefault(); startDrop(); });
+  $("resetBtn").addEventListener("click", () => {
+    Object.assign(state, { height: 2, mass: 60, cushion: 0, material: "foam", chute: 0 });
+    syncInputs(); toReady();
+  });
+  $("speed").addEventListener("click", e => {
+    const b = e.target.closest("[data-s]"); if (!b) return;
+    speed = parseFloat(b.dataset.s);
+    for (const x of $("speed").children) x.setAttribute("aria-pressed", String(x === b));
+  });
+
+  // ---------- results panel ----------
+  function clearResults() {
+    $("force").innerHTML = "—<small>N</small>";
+    $("verdict").className = "pill idle"; $("verdict").textContent = "Waiting for drop";
+    $("gauge").style.width = "0";
+    $("explain").innerHTML = "Press <strong>Drop the egg</strong> to run the test.";
+    for (const id of ["sTime", "sSpeed", "sStop", "sStopT", "sTerm", "sSafe"]) $(id).textContent = "—";
+  }
+  function showResults(p, r) {
+    $("force").innerHTML = fmtForce(r.F) + "<small>N</small>";
+    const v = $("verdict");
+    v.className = "pill " + (r.broken ? "bad" : "ok");
+    v.textContent = r.broken ? "Cracked" : "Survived";
+    const g = $("gauge");
+    g.style.width = Math.min(100, (r.F / (BREAK_N * 2)) * 100) + "%";
+    g.style.background = r.broken ? "var(--bad)" : "var(--ok)";
+    $("sTime").textContent = fmt(r.t, 2) + " s";
+    $("sSpeed").textContent = fmt(r.v, 2) + " m/s";
+    $("sStop").textContent = fmt(r.d * 100, 1) + " cm";
+    $("sStopT").textContent = fmt(r.stopT * 1000, 1) + " ms";
+    $("sTerm").textContent = fmt(r.vt, 1) + " m/s";
+    $("sSafe").textContent = r.safe === Infinity ? "Any height" : fmtH(r.safe);
+
+    const ratio = r.F / BREAK_N;
+    let msg;
+    if (r.broken) {
+      const tips = [];
+      if (p.cushion === 0) tips.push("add cushioning to give it more room to slow down");
+      else tips.push("use thicker or squishier cushioning");
+      if (p.chute === 0) tips.push("add a parachute to cut the landing speed");
+      else tips.push("try a bigger parachute");
+      msg = `That's <strong>${fmt(ratio, 1)}×</strong> the 20 N the shell can take. To save it, ${tips.join(" or ")}.`;
+    } else {
+      msg = `The shell took <strong>${fmt(ratio * 100, 0)}%</strong> of its 20 N limit. ` +
+        (r.safe === Infinity ? "With this setup the egg is safe from any height, because drag caps its speed."
+          : `This setup should hold up to about <strong>${fmtH(r.safe)}</strong>.`);
+    }
+    $("explain").innerHTML = msg;
+  }
+
+  // ---------- trial log ----------
+  const log = [];
+  function addLog(p, r) {
+    log.unshift({ n: log.length + 1, ...p, v: r.v, F: r.F, broken: r.broken });
+    const body = $("logBody");
+    body.innerHTML = log.slice(0, 20).map(x => `<tr>
+      <td>#${x.n}</td><td>${fmtH(x.height)}</td><td>${x.mass} g</td>
+      <td>${x.cushion > 0 ? fmt(x.cushion, 1) + " cm " + MATERIALS[x.material].name.toLowerCase() : "none"}</td>
+      <td>${x.chute > 0 ? x.chute + " cm" : "none"}</td>
+      <td>${fmt(x.v, 2)} m/s</td><td>${fmtForce(x.F)} N</td>
+      <td class="${x.broken ? "res-bad" : "res-ok"}">${x.broken ? "Cracked" : "Survived"}</td></tr>`).join("");
+  }
+  $("clearLog").addEventListener("click", () => {
+    log.length = 0;
+    $("logBody").innerHTML = '<tr><td colspan="8" class="empty">Your drops will be listed here so you can compare setups.</td></tr>';
+  });
+
+  // ---------- animation ----------
+  const cv = $("cv"), ctx = cv.getContext("2d");
+  let W = 0, H = 0, dpr = 1;
+  const anim = { phase: "ready", t0: 0, simT: 0, result: null, params: { ...state }, impactAt: 0 };
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const r = cv.getBoundingClientRect();
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  new ResizeObserver(resize).observe(cv);
+
+  function toReady() {
+    anim.phase = "ready"; anim.params = { ...state }; anim.result = null;
+    clearResults();
+  }
+  function startDrop() {
+    anim.params = { ...state };
+    anim.result = run(anim.params);
+    anim.phase = "falling"; anim.t0 = performance.now(); anim.simT = 0;
+    clearResults();
+    $("verdict").textContent = "Falling…";
+    if (reduceMotion) land(performance.now());
+  }
+  function land(now) {
+    anim.phase = "landed"; anim.impactAt = now; anim.simT = anim.result.t;
+    showResults(anim.params, anim.result);
+    addLog(anim.params, anim.result);
+  }
+
+  function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function niceStep(h) {
+    const steps = [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10, 20, 25, 50];
+    for (const s of steps) if (h / s <= 8) return s;
+    return 100;
+  }
+
+  function sampleTraj(traj, t) {
+    if (t <= 0) return traj[0];
+    let lo = 0, hi = traj.length - 1;
+    if (t >= traj[hi].t) return traj[hi];
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (traj[mid].t <= t) lo = mid; else hi = mid; }
+    const a = traj[lo], b = traj[hi], f = (t - a.t) / (b.t - a.t || 1);
+    return { t, y: a.y + (b.y - a.y) * f, v: a.v + (b.v - a.v) * f };
+  }
+
+  function drawEgg(x, yBottom, sx, sy, c) {
+    const rx = 13 * sx, ry = 17 * sy;
+    const cy = yBottom - ry;
+    ctx.save();
+    const grad = ctx.createRadialGradient(x - rx * 0.35, cy - ry * 0.4, 2, x, cy, ry * 1.2);
+    grad.addColorStop(0, "#FFFBF3"); grad.addColorStop(0.55, c.shell); grad.addColorStop(1, c.shellShade);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    // egg shape: narrower top
+    ctx.moveTo(x, cy - ry);
+    ctx.bezierCurveTo(x + rx * 0.95, cy - ry, x + rx * 1.05, cy + ry * 0.35, x + rx * 0.98, cy + ry * 0.35);
+    ctx.bezierCurveTo(x + rx * 0.9, cy + ry, x - rx * 0.9, cy + ry, x - rx * 0.98, cy + ry * 0.35);
+    ctx.bezierCurveTo(x - rx * 1.05, cy + ry * 0.35, x - rx * 0.95, cy - ry, x, cy - ry);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.18)"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.restore();
+    return { top: cy - ry };
+  }
+
+  function drawChute(x, eggTop, diameterCm, c, alpha) {
+    const w = Math.max(30, Math.min(150, diameterCm * 1.3));
+    const lift = 34 + w * 0.18;
+    const cy = eggTop - lift;
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.strokeStyle = c.muted; ctx.lineWidth = 1;
+    for (const f of [-1, -0.45, 0.45, 1]) {
+      ctx.beginPath(); ctx.moveTo(x + (w / 2) * f, cy); ctx.lineTo(x, eggTop + 2); ctx.stroke();
+    }
+    ctx.fillStyle = c.bad;
+    ctx.beginPath();
+    ctx.moveTo(x - w / 2, cy);
+    ctx.quadraticCurveTo(x - w / 2, cy - w * 0.42, x, cy - w * 0.42);
+    ctx.quadraticCurveTo(x + w / 2, cy - w * 0.42, x + w / 2, cy);
+    // scalloped hem
+    const n = 4;
+    for (let i = n; i > 0; i--) {
+      const x1 = x - w / 2 + (w / n) * (i - 0.5), x0 = x - w / 2 + (w / n) * (i - 1);
+      ctx.quadraticCurveTo(x1, cy - 6, x0, cy);
+    }
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath();
+    ctx.moveTo(x - w * 0.08, cy - 3);
+    ctx.quadraticCurveTo(x - w * 0.1, cy - w * 0.4, x, cy - w * 0.42);
+    ctx.quadraticCurveTo(x + w * 0.1, cy - w * 0.4, x + w * 0.08, cy - 3);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSplat(x, yLand, k, c) {
+    // k: 0..1 spread progress
+    const e = 1 - Math.pow(1 - k, 3);
+    ctx.save();
+    // albumen
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.beginPath();
+    const n = 14;
+    for (let i = 0; i <= n; i++) {
+      const a = Math.PI + (i / n) * Math.PI;
+      const wob = 1 + 0.18 * Math.sin(i * 2.7) + 0.1 * Math.cos(i * 5.1);
+      const r = (16 + 34 * e) * wob;
+      const px = x + Math.cos(a) * r * 1.0, py = yLand + Math.sin(a) * r * 0.16;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.fill();
+    // yolk
+    ctx.fillStyle = c.yolk;
+    ctx.beginPath(); ctx.ellipse(x + 3, yLand - 4 * (1 - e * 0.4), 10 + 4 * e, 6 - 1.5 * e, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.beginPath(); ctx.ellipse(x, yLand - 6 + 2 * e, 3, 1.6, -0.3, 0, Math.PI * 2); ctx.fill();
+    // shell halves
+    const drift = 22 * e;
+    shellHalf(x - 12 - drift, yLand - 7, -0.9 - e * 0.6, c);
+    shellHalf(x + 14 + drift * 1.1, yLand - 6, 0.8 + e * 0.7, c);
+    ctx.restore();
+  }
+  function shellHalf(x, y, rot, c) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+    ctx.fillStyle = c.shell; ctx.strokeStyle = c.shellShade; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-11, 0);
+    ctx.bezierCurveTo(-11, 12, 11, 12, 11, 0);
+    const zz = [[8, -3], [5, 1], [2, -4], [-1, 0], [-4, -3], [-7, 1]];
+    for (const [a, b] of zz) ctx.lineTo(a, b);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  function frame(now) {
+    if (!W) { requestAnimationFrame(frame); return; }
+    const c = {
+      skyTop: css("--sky-top"), skyBot: css("--sky-bot"), floor: css("--floor"), floorDark: css("--floor-dark"),
+      ink: css("--ink"), muted: css("--muted"), line: css("--line"), yolk: css("--yolk"), shell: css("--shell"),
+      shellShade: css("--shell-shade"), ok: css("--ok"), bad: css("--bad"), accent: css("--accent"), panel: css("--panel"),
+    };
+    const p = anim.params, r = anim.result;
+    const mono = getComputedStyle(document.body).getPropertyValue("--font-mono") || "monospace";
+
+    // background
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, c.skyTop); sky.addColorStop(1, c.skyBot);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+    const floorH = 34;
+    const groundTop = H - floorH;
+    const topY = Math.min(140, H * 0.26);
+    const scaleRaw = (groundTop - topY) / p.height;
+    const cushionTrue = (p.cushion / 100) * scaleRaw;
+    const cushionPx = p.cushion > 0 ? Math.max(7, Math.min(70, cushionTrue)) : 0;
+    const landY = groundTop - cushionPx;
+    const scale = (landY - topY) / p.height;
+    const eggX = Math.round(W * 0.56);
+
+    // floor
+    ctx.fillStyle = c.floor; ctx.fillRect(0, groundTop, W, floorH);
+    ctx.strokeStyle = c.floorDark; ctx.lineWidth = 1;
+    for (let x = -floorH; x < W; x += 12) { ctx.beginPath(); ctx.moveTo(x, H); ctx.lineTo(x + floorH, groundTop); ctx.stroke(); }
+    ctx.fillStyle = c.floorDark; ctx.fillRect(0, groundTop, W, 2);
+
+    // cushion
+    if (cushionPx > 0) {
+      const mat = MATERIALS[p.material];
+      const cw = Math.min(W * 0.5, 220), cx0 = eggX - cw / 2;
+      ctx.fillStyle = mat.fill; ctx.fillRect(cx0, landY, cw, cushionPx);
+      ctx.fillStyle = mat.dot;
+      for (let yy = landY + 3; yy < groundTop - 2; yy += 6)
+        for (let xx = cx0 + 4 + ((yy / 6) % 2) * 4; xx < cx0 + cw - 3; xx += 9) {
+          ctx.beginPath(); ctx.arc(xx, yy, p.material === "bubble" ? 2.4 : 1.3, 0, Math.PI * 2); ctx.fill();
+        }
+      ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.strokeRect(cx0 + 0.5, landY + 0.5, cw - 1, cushionPx - 1);
+      ctx.fillStyle = c.ink; ctx.font = `600 11px ${mono}`; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      const lbl = `${fmt(p.cushion, 1)} cm ${mat.name.toLowerCase()}` + (cushionTrue < 7 || cushionTrue > 70 ? " (not to scale)" : "");
+      ctx.fillText(lbl, cx0 + cw + 8, landY + cushionPx / 2);
+    }
+
+    // height ruler
+    const rx = 44;
+    ctx.strokeStyle = c.muted; ctx.fillStyle = c.muted; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(rx, topY); ctx.lineTo(rx, landY); ctx.stroke();
+    ctx.font = `11px ${mono}`; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    const step = niceStep(p.height);
+    for (let h = 0; h <= p.height + 1e-9; h += step) {
+      const y = landY - h * scale;
+      ctx.beginPath(); ctx.moveTo(rx - 5, y); ctx.lineTo(rx, y); ctx.stroke();
+      if (Math.abs(y - topY) > 12 || h === 0) ctx.fillText(step < 1 ? fmt(h, step < 0.1 ? 2 : 1) : fmt(h, 0), rx - 8, y);
+    }
+    ctx.textAlign = "left"; ctx.fillStyle = c.ink; ctx.font = `600 11px ${mono}`;
+    ctx.fillText("m", rx - 30, topY - 22);
+
+    // drop ledge + height marker
+    ctx.fillStyle = c.floorDark;
+    ctx.fillRect(eggX + 22, topY - 4, Math.min(140, W - eggX - 22), 8);
+    ctx.setLineDash([4, 5]); ctx.strokeStyle = c.accent; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(rx, topY); ctx.lineTo(eggX - 30, topY); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = c.accent; ctx.font = `600 12px ${mono}`; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
+    ctx.fillText(fmtH(p.height), eggX - 34, topY - 4);
+
+    // egg state
+    let eggY = p.height, vNow = 0, tNow = 0;
+    if (anim.phase === "falling") {
+      anim.simT = ((now - anim.t0) / 1000) * speed;
+      const s = sampleTraj(r.traj, anim.simT);
+      eggY = s.y; vNow = s.v; tNow = Math.min(anim.simT, r.t);
+      if (anim.simT >= r.t) { land(now); eggY = 0; vNow = r.v; tNow = r.t; }
+    } else if (anim.phase === "landed") {
+      eggY = 0; vNow = 0; tNow = r.t;
+    }
+    const eggBottomPx = landY - eggY * scale;
+
+    if (anim.phase !== "landed") {
+      // motion streaks
+      if (anim.phase === "falling" && vNow > 1) {
+        ctx.strokeStyle = c.muted; ctx.globalAlpha = Math.min(0.6, vNow / 15); ctx.lineWidth = 1.5;
+        const len = Math.min(60, vNow * 4);
+        for (const dx of [-9, 0, 9]) {
+          ctx.beginPath(); ctx.moveTo(eggX + dx, eggBottomPx - 40 - (dx === 0 ? 6 : 0)); ctx.lineTo(eggX + dx, eggBottomPx - 40 - len); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+      const e = drawEgg(eggX, eggBottomPx, 1, 1, c);
+      if (p.chute > 0) drawChute(eggX, e.top, p.chute, c, 1);
+    } else {
+      const since = (now - anim.impactAt) / 1000;
+      const sink = Math.min(cushionPx * MATERIALS[p.material].squash, cushionPx);
+      if (r.broken) {
+        if (since < 0.09 && !reduceMotion) {
+          const k = since / 0.09;
+          drawEgg(eggX, landY + sink * k, 1 + 0.3 * k, 1 - 0.4 * k, c);
+        } else {
+          const k = reduceMotion ? 1 : Math.min(1, (since - 0.09) / 0.5);
+          drawSplat(eggX, landY + 1, k, c);
+          if (k < 1) { // crack burst
+            ctx.strokeStyle = c.bad; ctx.lineWidth = 2; ctx.globalAlpha = 1 - k;
+            for (let i = 0; i < 8; i++) {
+              const a = Math.PI + (i / 7) * Math.PI;
+              const r0 = 22 + 30 * k, r1 = r0 + 12;
+              ctx.beginPath(); ctx.moveTo(eggX + Math.cos(a) * r0, landY - 10 + Math.sin(a) * r0 * 0.7);
+              ctx.lineTo(eggX + Math.cos(a) * r1, landY - 10 + Math.sin(a) * r1 * 0.7); ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+          }
+        }
+        if (p.chute > 0) {
+          const k = Math.min(1, since / 0.8);
+          drawChute(eggX + 40 * k, landY - 20 + 10 * k, p.chute, c, 1 - k * 0.7);
+        }
+      } else {
+        // squish into cushion then small bounce
+        let sy = 1, sx = 1, off = sink, bounce = 0;
+        if (!reduceMotion && since < 0.7) {
+          if (since < 0.12) { const k = Math.sin((since / 0.12) * Math.PI); sy = 1 - 0.15 * k; sx = 1 + 0.08 * k; }
+          else { const k = (since - 0.12) / 0.58; bounce = Math.abs(Math.sin(k * Math.PI * 2)) * 10 * (1 - k); }
+        }
+        const e = drawEgg(eggX, landY + off * 0.4 - bounce, sx, sy, c);
+        if (p.chute > 0) {
+          const k = Math.min(1, since / 0.8);
+          drawChute(eggX + 38 * k, e.top + 18 * k, p.chute, c, 1 - k * 0.6);
+        }
+        if (since > 0.4) {
+          ctx.globalAlpha = Math.min(1, (since - 0.4) / 0.3);
+          ctx.fillStyle = c.ok; ctx.font = `700 13px ${mono}`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+          ctx.fillText("✓ intact", eggX, landY - 44);
+          ctx.globalAlpha = 1;
+        }
+      }
+      if (r.broken && since > 0.4) {
+        ctx.globalAlpha = Math.min(1, (since - 0.4) / 0.3);
+        ctx.fillStyle = c.bad; ctx.font = `700 13px ${mono}`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+        ctx.fillText("✕ cracked", eggX, landY - 36);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // HUD
+    const hud = [
+      ["t", fmt(tNow, 2) + " s"],
+      ["v", fmt(vNow, 2) + " m/s"],
+      ["h", fmt(Math.max(0, eggY), 2) + " m"],
+    ];
+    ctx.font = `12px ${mono}`; ctx.textBaseline = "top";
+    const bx = W - 132, by = 12;
+    ctx.fillStyle = c.panel; ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(bx, by, 120, 62, 8) : ctx.rect(bx, by, 120, 62); ctx.fill();
+    ctx.globalAlpha = 1;
+    hud.forEach(([k, v], i) => {
+      ctx.textAlign = "left"; ctx.fillStyle = c.muted; ctx.fillText(k, bx + 10, by + 8 + i * 16);
+      ctx.textAlign = "right"; ctx.fillStyle = c.ink; ctx.fillText(v, bx + 110, by + 8 + i * 16);
+    });
+    if (anim.phase === "falling" && speed < 1) {
+      ctx.textAlign = "left"; ctx.fillStyle = c.muted; ctx.fillText(speed === 0.5 ? "½× slow motion" : "⅕× slow motion", 58, 12);
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  syncInputs();
+  toReady();
+  requestAnimationFrame(frame);
+  setTimeout(() => { if (anim.phase === "ready") startDrop(); }, 700);
+})();
+</script>
